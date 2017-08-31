@@ -1,4 +1,5 @@
 use std::io::Read;
+use std::io::BufRead;
 use std::io::BufReader;
 
 use color::{ColorType};
@@ -20,6 +21,7 @@ impl<R: Read> PPMDecoder<R> {
     pub fn new(r: R) -> ImageResult<PPMDecoder<R>> {
         let mut buf = BufReader::new(r);
         try!(PPMDecoder::read_next_string(&mut buf)); // Skip P6
+        try!(PPMDecoder::read_comment(&mut buf)); // Skip optional comment.
         let width = try!(PPMDecoder::read_next_u32(&mut buf));
         let height = try!(PPMDecoder::read_next_u32(&mut buf));
         let maxwhite = try!(PPMDecoder::read_next_u32(&mut buf));
@@ -30,6 +32,26 @@ impl<R: Read> PPMDecoder<R> {
             maxwhite: maxwhite,
         })
     }
+
+  fn peek_u8(reader: &mut BufReader<R>) -> ImageResult<u8> {
+      let buf = try!(reader.fill_buf());
+      if buf.len() == 0 {
+          Err(ImageError::FormatError("Unexpected end of file".to_string()))
+      } else {
+          Ok(buf[0])
+      }
+  }
+
+  fn read_comment(reader: &mut BufReader<R>) -> ImageResult<String> {
+      let is_comment = try!(PPMDecoder::peek_u8(reader));
+      if is_comment == b'#' {
+          let mut comment = String::new();
+          try!(reader.read_line(&mut comment));
+          Ok(comment)
+      } else {
+          Ok(("".to_string()))
+      }
+  }
 
   fn read_next_string(reader: &mut BufReader<R>) -> ImageResult<String> {
       let mut bytes = Vec::new();
